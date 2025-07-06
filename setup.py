@@ -1,0 +1,56 @@
+from setuptools import setup, find_packages
+import PySlidesGenerator as package
+
+setup(
+    name='PySlidesGenerator',
+    version=package.__version__,
+    py_modules=['PySlidesGenerator'],
+    packages=find_packages(include=[]),
+    install_requires=[],
+    scripts=[],
+    author="Maurice Lambert",
+    author_email="mauricelambert434@gmail.com",
+    maintainer="Maurice Lambert",
+    maintainer_email="mauricelambert434@gmail.com",
+    description='little GUI to generate my slides',
+    long_description=open('README.md').read(),
+    long_description_content_type="text/markdown",
+    url="https://github.com/mauricelambert/PySlidesGenerator",
+    project_urls={
+        "Github": "https://github.com/mauricelambert/PySlidesGenerator",
+        "Documentation": "https://mauricelambert.github.io/info/python/code/PySlidesGenerator.html",
+        "Python Executable": "https://mauricelambert.github.io/info/python/code/PySlidesGenerator.pyz",
+        "Windows Executable": "https://mauricelambert.github.io/info/python/code/PySlidesGenerator.exe",
+    },
+    download_url="https://mauricelambert.github.io/info/python/code/PySlidesGenerator.pyz",
+    include_package_data=True,
+    classifiers=[
+        "Topic :: System",
+        "Topic :: Software Development :: Libraries",
+        "Environment :: Console",
+        "Topic :: System :: Shells",
+        'Operating System :: POSIX',
+        "Natural Language :: English",
+        "Topic :: System :: Networking",
+        "Topic :: Internet :: WWW/HTTP",
+        "Programming Language :: Python",
+        "Intended Audience :: Developers",
+        "Topic :: System :: System Shells",
+        'Operating System :: MacOS :: MacOS X',
+        "Programming Language :: Python :: 3.8",
+        'Operating System :: Microsoft :: Windows',
+        "Topic :: System :: Systems Administration",
+        "Development Status :: 5 - Production/Stable",
+        "Intended Audience :: System Administrators",
+        "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+    ],
+    keywords=['slides', 'presentations', 'slides-generator'],
+    platforms=['Windows', 'Linux', "MacOS"],
+    license="GPL-3.0 License",
+    entry_points = {
+        'console_scripts': [
+            'PySlidesGenerator = PySlidesGenerator:main'
+        ],
+    },
+    python_requires='>=3.8',
+)
