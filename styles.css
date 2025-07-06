@@ -1,3 +1,22 @@
+/*
+  Copyright (C) 2025 MauriceLambert
+
+  This file is part of HackingPresentationGenerator.
+
+  HackingPresentationGenerator is free software: you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published by
+  the Free Software Foundation, either version 3 of the License, or
+  (at your option) any later version.
+
+  HackingPresentationGenerator is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU General Public License for more details.
+
+  You should have received a copy of the GNU General Public License
+  along with HackingPresentationGenerator.  If not, see <https://www.gnu.org/licenses/>.
+*/
+
 :root {
   --bg-color-dark: #0d0d0d;
   --text-color-dark: #00ff00;
@@ -22,6 +41,12 @@ body {
   line-height: 1.6;
   background-color: var(--bg-color-dark);
   color: var(--text-color-dark);
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+body::-webkit-scrollbar {
+  display: none;
 }
 
 body.light {
@@ -33,6 +58,12 @@ main {
   height: 100vh;
   overflow-y: scroll;
   scroll-snap-type: y mandatory;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+main::-webkit-scrollbar {
+  display: none;
 }
 
 section {
@@ -44,6 +75,12 @@ section {
   align-items: center;
   padding: 4rem 2rem 2rem;
   box-sizing: border-box;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+section::-webkit-scrollbar {
+  display: none;
 }
 
 section.title-slide,
