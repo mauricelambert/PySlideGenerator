@@ -23,7 +23,7 @@
 little GUI to generate my slides
 """
 
-__version__ = "0.0.1"
+__version__ = "0.0.2"
 __author__ = "Maurice Lambert"
 __author_email__ = "mauricelambert434@gmail.com"
 __maintainer__ = "Maurice Lambert"
@@ -181,6 +181,16 @@ template = Template(
       </nav>
     </section>
     ${slides}
+    <section class="timeline-slide content-slide" id="timeline-slide">
+      <header>
+        <img src="https://mauricelambert.github.io/MauriceLambert.png" alt="MauriceLambert icon" />
+        <h3>My path, my passion: cybersecurity</h3>
+      </header>
+      <article>
+        <div id="timeline-container"></div>
+        <div id="timeline-progress"></div>
+      </article>
+    </section>
   </main>
   <footer>
     <p><a href="https://www.gnu.org/licenses/">&copy; ${author}</a></p>

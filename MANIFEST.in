@@ -2,3 +2,5 @@ include *.md
 include *.txt
 include *.toml
 include *.cfg
+include *.css
+include *.js

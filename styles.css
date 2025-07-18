@@ -1,20 +1,20 @@
 /*
   Copyright (C) 2025 MauriceLambert
 
-  This file is part of HackingPresentationGenerator.
+  This file is part of PySlideGenerator.
 
-  HackingPresentationGenerator is free software: you can redistribute it and/or modify
+  PySlideGenerator is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 3 of the License, or
   (at your option) any later version.
 
-  HackingPresentationGenerator is distributed in the hope that it will be useful,
+  PySlideGenerator is distributed in the hope that it will be useful,
   but WITHOUT ANY WARRANTY; without even the implied warranty of
   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
   GNU General Public License for more details.
 
   You should have received a copy of the GNU General Public License
-  along with HackingPresentationGenerator.  If not, see <https://www.gnu.org/licenses/>.
+  along with PySlideGenerator.  If not, see <https://www.gnu.org/licenses/>.
 */
 
 :root {
@@ -45,6 +45,11 @@ body {
   -ms-overflow-style: none;
 }
 
+body *::selection {
+  background-color: var(--text-color-dark);
+  color: var(--bg-color-dark);
+}
+
 body::-webkit-scrollbar {
   display: none;
 }
@@ -52,6 +57,11 @@ body::-webkit-scrollbar {
 body.light {
   background-color: var(--bg-color-light);
   color: var(--text-color-light);
+}
+
+body.light *::selection {
+  background-color: var(--text-color-light);
+  color: var(--bg-color-light);
 }
 
 main {
@@ -127,7 +137,7 @@ section.content-slide article {
   display: flex;
   flex-direction: row;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   gap: 2rem;
   width: 100%;
   max-width: 1200px;
@@ -287,4 +297,38 @@ h1, h2, h3 {
   overflow-y: hidden;
   display: none;
   white-space: pre-wrap;
+}
+
+#timeline-container {
+  font-family: "Courier New", monospace;
+  color: #00ff00;
+  white-space: pre-wrap;
+  overflow: hidden;
+  font-size: 1.2rem;
+  min-height: 200px;
+  margin-bottom: 1rem;
+  animation: flickerText 0.2s infinite alternate;
+}
+
+@keyframes flickerText {
+  0% { opacity: 1; }
+  100% { opacity: 0.95; }
+}
+
+#timeline-progress {
+  font-family: "Courier New", monospace;
+  color: var(--text-color-dark);
+  background: var(--bg-color-dark);
+  /* border: 1px solid #00ff00; */
+  padding: 4px 8px;
+  font-size: 1rem;
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 90%;
+  text-align: left;
+  box-sizing: border-box;
+  height: auto;
+  white-space: pre;
 }
