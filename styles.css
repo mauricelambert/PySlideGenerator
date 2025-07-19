@@ -332,3 +332,12 @@ h1, h2, h3 {
   height: auto;
   white-space: pre;
 }
+
+.theme-toggle {
+  transition: opacity 0.3s ease;
+}
+
+.theme-toggle[style*="display: none"] {
+  opacity: 0;
+  pointer-events: none;
+}

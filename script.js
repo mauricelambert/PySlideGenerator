@@ -1,20 +1,20 @@
 /*
   Copyright (C) 2025 MauriceLambert
 
-  This file is part of HackingPresentationGenerator.
+  This file is part of PySlideGenerator.
 
-  HackingPresentationGenerator is free software: you can redistribute it and/or modify
+  PySlideGenerator is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 3 of the License, or
   (at your option) any later version.
 
-  HackingPresentationGenerator is distributed in the hope that it will be useful,
+  PySlideGenerator is distributed in the hope that it will be useful,
   but WITHOUT ANY WARRANTY; without even the implied warranty of
   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
   GNU General Public License for more details.
 
   You should have received a copy of the GNU General Public License
-  along with HackingPresentationGenerator.  If not, see <https://www.gnu.org/licenses/>.
+  along with PySlideGenerator.  If not, see <https://www.gnu.org/licenses/>.
 */
 
 let slide_index = 0;
@@ -23,10 +23,11 @@ document.addEventListener("DOMContentLoaded", () => {
   const sections = document.querySelectorAll("main section");
 
   const scrollToSlide = (index) => {
-    if (index >= 0 && index < sections.length) {
-      sections[index].scrollIntoView({ behavior: 'smooth' });
-      slide_index = index;
-    }
+    const total = sections.length;
+    const newIndex = ((index % total) + total) % total;
+    sections[newIndex].scrollIntoView({ behavior: 'smooth' });
+    slide_index = newIndex;
+    repositionToggleButton();
   };
 
   document.addEventListener("keydown", (e) => {
@@ -41,6 +42,32 @@ document.addEventListener("DOMContentLoaded", () => {
   toggleBtn.textContent = "Toggle Theme";
   toggleBtn.className = "theme-toggle";
   document.body.appendChild(toggleBtn);
+  let toggleBtnLeftPos = toggleBtn.getBoundingClientRect().left;
+
+  const repositionToggleButton = () => {
+    const currentSection = sections[slide_index];
+    const header = currentSection.querySelector("header");
+    const title = header?.querySelector("h3");
+
+    if (!header || !title) {
+        toggleBtn.style.display = "block";
+        return;
+    }
+
+    const titleRect = title.getBoundingClientRect();
+    const toggleRect = toggleBtn.getBoundingClientRect();
+
+    const isOverlapping = (
+      titleRect.right + 16 > window.innerWidth ||
+      titleRect.right > (toggleRect.left || toggleBtnLeftPos)
+    );
+
+    toggleBtn.style.display = isOverlapping ? "none" : "block";
+
+    if (toggleRect.left !== 0) {
+      toggleBtnLeftPos = toggleRect.left;
+    }
+  };
 
   const applyTheme = (theme) => {
     document.body.classList.remove("dark", "light");
@@ -55,6 +82,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const newTheme = document.body.classList.contains("dark") ? "light" : "dark";
     applyTheme(newTheme);
   });
+
+  window.addEventListener("resize", repositionToggleButton);
 
   let scrollTimeout;
   document.querySelector("main").addEventListener("scroll", () => {
@@ -127,9 +156,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (!fitsInSlide()) {
-      textElements.forEach((el, idx) => {
-        el.style.fontSize = `${originalSizes[idx]}px`;
-      });
+      if (article.tagName.toLowerCase() !== 'nav') {
+        textElements.forEach((el, idx) => {
+          el.style.fontSize = `${originalSizes[idx]}px`;
+        });
+      }
       article.style.overflowY = 'auto';
       article.style.webkitOverflowScrolling = 'touch';
     }
@@ -328,7 +359,7 @@ const scenarios = [
 
 const timeoutIds = [];
 
-function typeLines(lines, container, overlay, delay = 500) {
+function typeLines(lines, container, overlay, delay = 500, callback = triggerTerminalAnimation, waiting_time = 2000) {
   let character_index = 0;
   let characters = null;
   let index = 0;
@@ -366,7 +397,7 @@ function typeLines(lines, container, overlay, delay = 500) {
         timeoutIds.push(id);
       }
     } else {
-      const id = setTimeout(triggerTerminalAnimation, 2000);
+      const id = setTimeout(callback, waiting_time);
       timeoutIds.push(id);
     }
   };
@@ -412,5 +443,261 @@ document.addEventListener('DOMContentLoaded', () => {
 
   ['mousemove', 'keydown', 'click', 'touchstart'].forEach(event => {
     document.addEventListener(event, hideOverlay);
+  });
+});
+
+document.addEventListener("DOMContentLoaded", () => {
+  const timelineData = [
+    {
+      "name": "HS Diploma – AP Comp Sci",
+      "title": "High School Diploma with Advanced Placement in Computer Science",
+      "period": "2017 - 2018",
+      "version": "Development.Curious",
+      "tags": ["Python", "Development", "Algorithmics", "Mathematics"],
+      "details": [
+        "Completed a comprehensive training program covering applied mathematics",
+        "in computer science, algorithmics, and software development using Python."
+      ]
+    },
+    {
+      "name": "Sport Tracker Project",
+      "title": "Personal Project: Secure Web & Windows/Linux Application Development",
+      "period": "2018 - 2019",
+      "version": "Development.Explorer",
+      "tags": ["Python", "Web Application", "Windows/Linux Application", "Web Security", "Deployment"],
+      "details": [
+        "Designed and developed a cross-platform sport tracking application with a mini social network for athletes.",
+        "Built a secure web interface using a Python framework, implementing user authentication and data protection best practices.",
+        "Created a Windows/Linux desktop application for local use, synchronized with the web version.",
+        "Handled full-stack development, including frontend, backend, and API integration.",
+        "Deployed the application on a production environment, ensuring performance, stability, and secure access."
+      ]
+    },
+    {
+      "name": "HND in Computing",
+      "title": "Higher National Diploma in Computing",
+      "period": "2018 - 2020",
+      "version": "Development.Trainee",
+      "tags": ["Development", "Web", "Database", "Mobile", "Software Engineering", "Programming"],
+      "details": [
+        "Completed a two-year vocational diploma focusing on software development, application design, and database management.",
+        "Gained practical experience in developing web and mobile applications using multiple programming languages and frameworks.",
+        "Acquired knowledge in software engineering principles and system analysis."
+      ]
+    },
+    {
+      "name": "Fun offensive development & Hacking Challenges",
+      "title": "Personal Projects: Fun C2 framework and malicious scritps development & Challenges",
+      "period": "2019 - 2020",
+      "version": "Security.Curious",
+      "tags": ["C2 Development", "Socket Programming", "System scripting", "Web Hacking Challenges", "", ""],
+      "details": [
+        "Built a lightweight and humorous Command & Control (C2) framework using raw TCP sockets.",
+        "Implemented pseudo-malicious capabilities such as beep sounds, text-to-speech messages and basic command execution.",
+        "Created pseudo-malicious scripts to test how detection systems respond, driven by curiosity and a hands-on mindset.",
+        "Practiced and improved technical skills through hacking challenges and hacking platforms."
+      ]
+    },
+    {
+      "name": "Bachelor's Degree in Network and Systems Security",
+      "title": "Professional Bachelor's Degree in Network and Systems Administration and Security",
+      "period": "2020 - 2021",
+      "version": "Security.Trainee",
+      "tags": ["Network Security", "System Administration", "Incident Response", "Security Policies", "Pentest", "Software vulnerabilities"],
+      "details": [
+        "Completed a professional bachelor's degree focused on administration and security of IT systems and networks.",
+        "Gained hands-on experience through a work-study program within a growing cybersecurity team.",
+        "Participated in the implementation and monitoring of security policies and incident detection processes.",
+        "Worked with SIEM tools and contributed to early-stage security operations and threat analysis.",
+        "Developed skills in network configuration, vulnerability assessment, and system hardening."
+      ]
+    },
+    {
+      "name": "Security & Network Administrator",
+      "title": "System Hardening Automation – Linux & Windows",
+      "period": "2020 - 2021",
+      "version": "Security.Trainee",
+      "tags": ["System Hardening", "Automation", "Linux", "Windows", "Security Compliance"],
+      "details": [
+        "Automated and standardized OS hardening across Linux and Windows environments.",
+        "Implemented industrial-grade scripts for baseline configuration and vulnerability mitigation."
+      ]
+    },
+    {
+      "name": "DevSecOps Engineer",
+      "title": "SOC Platform Automation & Security Review",
+      "period": "2022",
+      "version": "Security.Curious",
+      "tags": ["DevSecOps", "SOC Automation", "Infrastructure", "Containerization", "Code Audit", "CI/CD"],
+      "details": [
+        "Developed the SOC server and its supporting infrastructure using secure-by-design principles.",
+        "Secured the full platform through containerization, hardening, and automated deployments.",
+        "Audited and improved all SOC codebases and implemented CI/CD pipelines for continuous delivery."
+      ]
+    },
+    {
+      "name": "CTF Participation",
+      "title": "Team-Based CTFs Focused on Web Exploitation and Forensics",
+      "period": "2022 - 2023",
+      "version": "Security.Explorer",
+      "tags": ["CTF", "Web Exploitation", "Forensics", "All-nighter", "Problem Solving", "Investigation"],
+      "details": [
+        "Participated in numerous Capture The Flag (CTF) competitions with a focus on web exploitation and digital forensics.",
+        "Solved challenges involving vulnerabilities in web technologies, file analysis, memory dumps, and log investigation.",
+        "Collaborated in teams to coordinate skills and approaches, improving real-time problem solving and communication.",
+        "Used CTFs as a continuous learning environment to simulate pentesting and investigation scenarios."
+      ]
+    },
+    {
+      "name": "Incident Responder",
+      "title": "Real-World Web Attacks & Forensic Analysis",
+      "period": "2023",
+      "version": "Security.Explorer",
+      "tags": ["Incident Response", "Forensics", "Web Security", "Domain Lateralization"],
+      "details": [
+        "Handled incident responses involving DMZ Web attacks and domain-wide compromise.",
+        "Performed forensic investigations and implemented mitigations post lateral movement."
+      ]
+    },
+    {
+      "name": "Internal Pentest Lab",
+      "title": "Pentesting System & Active Directory",
+      "period": "2023 - 2024",
+      "version": "Pentest.Trainee",
+      "tags": ["Internal Pentest", "Privilege Escalation", "Windows", "Linux", "SMB", "Active Directory"],
+      "details": [
+        "Completed multiple internal pentest labs simulating real-world infrastructure.",
+        "Focused on initial access techniques, system enumeration and local and domain privilege escalation."
+      ]
+    },
+    {
+      "name": "Master's Degree in Cybersecurity and Ethical Hacking",
+      "title": "Master's Degree (Level 7 RNCP) in Cybersecurity and Ethical Hacking",
+      "period": "2022 - 2025",
+      "version": "Security.Insider",
+      "tags": ["Penetration Testing", "Red Teaming", "Incident Response", "Reverse Engineering", "Malware Analysis", "Memory Exploitation", "Malware development"],
+      "details": [
+        "Three-year advanced program combining offensive and defensive cybersecurity strategies.",
+        "Focused on vulnerability exploitation, malware analysis, red teaming operations, and malware development.",
+        "Hands-on experience through real-world attack simulations and internships within security teams.",
+        "Developed strong expertise in cyber incident management, offensive techniques, and defensive strategies.",
+        "Graduated with a Level 7 RNCP certification, equivalent to a Master's degree."
+      ]
+    },
+    {
+      "name": "Open Source Security Tooling",
+      "title": "Development of Open Source Security Tools",
+      "period": "2021 - Present",
+      "version": "Development.Security.Enthusiast",
+      "tags": ["Open Source", "Incident Response", "Malware Development", "Network Attacks", "Web Attacks", "Security Tooling"],
+      "details": [
+        "Designed and published open source security tools for various stages of the attack and defense lifecycle.",
+        "Focused on supporting incident response, malware development, and network/web exploitation scenarios.",
+        "Built lightweight, modular utilities to streamline detection, response, and offensive operations.",
+        "Contributed to the cybersecurity community by sharing tools, code, and documentation under open licenses.",
+        "Promoted secure development practices while researching offensive and defensive capabilities."
+      ]
+    },
+    {
+      "name": "Cybersecurity Education & Outreach",
+      "title": "Web Security Workshops and Cyber Talks for Computer Science Students",
+      "period": "2022 - Present",
+      "version": "Security.Insider",
+      "tags": ["Web Security", "Education", "Workshops", "Cyber Awareness", "Vulnerability Exploitation", "CTF Challenges"],
+      "details": [
+        "Designed and delivered practical Web security workshops including custom vulnerability challenges.",
+        "Led engaging and accessible cybersecurity talks on real-world threats, tools, and defense strategies.",
+        "Adapted content to suit beginner and intermediate audiences with no prior cybersecurity background.",
+        "Promoted cyber awareness and best practices among students in computer science programs."
+      ]
+    },
+    {
+      "name": "Purple Team Operator",
+      "title": "EDR Evaluation & SIEM Bypass Testing",
+      "period": "2024 - Present",
+      "version": "Security.Insider",
+      "tags": ["Purple Team", "EDR Testing", "SIEM Bypass", "PoC", "Threat Simulation"],
+      "details": [
+        "Led proof-of-concept evaluations of multiple EDR solutions and simulated attack scenarios.",
+        "Designed and executed advanced SIEM bypass techniques to assess detection capabilities."
+      ]
+    },
+    {
+      "name": "Cybersecurity Community Talks",
+      "title": "Talks on Defensive Systems and Bypass Techniques",
+      "period": "2024 - Present",
+      "version": "Security.Insider",
+      "tags": ["Security Talks", "Defense Evasion", "Purple Teaming", "Detection Bypass", "Community", "Security Architecture"],
+      "details": [
+        "Delivered advanced talks in student cybersecurity associations on how modern defensive systems operate internally.",
+        "Explained architectural weaknesses and design flaws that can be leveraged for bypassing detection and controls.",
+        "Focused on real-world scenarios where standard defenses fall short and how attackers exploit them.",
+        "Promoted hands-on understanding of purple team techniques, defense evasion, and the importance of layered security."
+      ]
+    }
+  ];
+
+  const timelineTerminal = document.createElement("pre");
+  timelineTerminal.id = "timeline-terminal";
+
+  const container = document.getElementById("timeline-container");
+  const progressBar = document.getElementById("timeline-progress");
+
+  container.appendChild(timelineTerminal);
+
+  if (!container || !progressBar || timelineData.length === 0) return;
+
+  let currentIndex = 0;
+
+  const drawProgressBar = (current, total) => {
+    const percent = Math.round((current / total) * 100);
+
+    const progressElement = document.getElementById("timeline-progress");
+    const availableWidth = progressElement.getBoundingClientRect().width;
+
+    const fontSize = parseFloat(getComputedStyle(progressElement).fontSize);
+    const charWidth = fontSize * 0.55;
+    const barLength = Math.floor((availableWidth - 10 * charWidth) / charWidth);
+
+    const filledLength = Math.round((percent / 100) * barLength);
+    const bar = `[${"#".repeat(filledLength)}${".".repeat(barLength - filledLength)}] ${percent}%`;
+
+    return bar;
+  };
+
+  const displayEvent = () => {
+    timeoutIds.forEach(clearTimeout);
+    timeoutIds.length = 0;
+
+    const item = timelineData[currentIndex];
+    progressBar.innerText = drawProgressBar(currentIndex + 1, timelineData.length);
+    
+    currentIndex = (currentIndex + 1) % timelineData.length;
+
+    const lines = [
+      "root@kali:~# ",
+      `apt show "${item.name}"`.split(''),
+      `Period: ${item.period}`,
+      `Package: ${item.title}`,
+      `Version: ${item.version}`,
+      "Author: Maurice Lambert",
+      "Tags: " + item.tags.join(', '),
+      "Description:",
+      ...item.details
+    ];
+
+    typeLines(lines, container, timelineTerminal, 1000, displayEvent, 6000);
+  };
+
+  if (window.location.hash === "#timeline-slide" || slide_index === (document.querySelectorAll("main section").length - 1)) {
+    displayEvent();
+  }
+
+  document.querySelector("main").addEventListener("scroll", () => {
+    const activeSlide = document.querySelectorAll("main section")[slide_index];
+    if (activeSlide && activeSlide.id === "timeline-slide" && container.innerText === "") {
+      currentIndex = 0;
+      displayEvent();
+    }
   });
 });
