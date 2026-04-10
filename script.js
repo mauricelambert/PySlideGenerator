@@ -1,5 +1,5 @@
 /*
-  Copyright (C) 2025 MauriceLambert
+  Copyright (C) 2025, 2026 MauriceLambert
 
   This file is part of PySlideGenerator.
 
@@ -19,8 +19,140 @@
 
 let slide_index = 0;
 
-document.addEventListener("DOMContentLoaded", () => {
-  const sections = document.querySelectorAll("main section");
+const applyTheme = (themeName, mode) => {
+  const theme = themes[themeName];
+  if (!theme) return;
+
+  const set = (k, v) => document.documentElement.style.setProperty(k, v);
+  set('--bg-color-dark',   theme.dark.bgColor);
+  set('--text-color-dark', theme.dark.textColor);
+  set('--bg-color-light',  theme.light.bgColor);
+  set('--text-color-light',theme.light.textColor);
+  set('--font-family',     theme.fontFamily);
+  set('--transition-speed',theme.transitionSpeed);
+
+  document.body.classList.remove('dark', 'light');
+  document.body.classList.add(mode);
+  document.getElementById('terminal-overlay')?.classList.remove('dark','light');
+  document.getElementById('terminal-overlay')?.classList.add(mode);
+
+  localStorage.setItem('theme', themeName);
+  localStorage.setItem('mode',  mode);
+  resizeContent();
+};
+
+function buildBiosPopup() {
+  const themeKeys = Object.keys(themes);
+
+  const overlay = document.createElement('div');
+  overlay.id = 'bios-overlay';
+  overlay.innerHTML = `
+    <div class="bios-box">
+      <div class="bios-title-bar">[ PRESENTATION THEME SETUP UTILITY v2.1 ]</div>
+      <div class="bios-body">
+        <div class="bios-subtitle">Use ↑↓ arrows or click to navigate · Live preview</div>
+        <div class="bios-section-label">&gt; PRESET THEMES</div>
+        <div id="bios-theme-list">
+          ${themeKeys.map((key, i) => `
+            <div class="bios-row" data-theme="${key}" data-index="${i}">
+              <span class="bios-arrow">▶</span>
+              <span class="bios-name">${key.toUpperCase()}</span>
+              <span class="bios-swatches">
+                <span class="swatch" style="background:${themes[key].dark.bgColor}"></span>
+                <span class="swatch" style="background:${themes[key].dark.textColor}"></span>
+                <span class="swatch" style="background:${themes[key].light.bgColor}"></span>
+                <span class="swatch" style="background:${themes[key].light.textColor}"></span>
+              </span>
+              <span class="bios-badge"></span>
+            </div>
+          `).join('')}
+        </div>
+        <hr class="bios-sep">
+        <div class="bios-section-label">&gt; COLOR MODE</div>
+        <div class="bios-mode-row">
+          <button class="bios-mode-btn" data-mode="dark">DARK</button>
+          <button class="bios-mode-btn" data-mode="light">LIGHT</button>
+        </div>
+      </div>
+      <div class="bios-live-bar">
+        <span class="bios-dot"></span>
+        LIVE PREVIEW — <span id="bios-live-label">─</span>
+      </div>
+      <div class="bios-footer">
+        <span><kbd>F10</kbd> Save</span>
+        <span><kbd>ESC</kbd> Cancel</span>
+        <span><kbd>↑↓</kbd> Navigate</span>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  let focusedIndex = 0;
+  let previewTheme = localStorage.getItem('theme') || 'hacker';
+  let previewMode  = localStorage.getItem('mode')  || 'dark';
+  const savedTheme = previewTheme;
+  const savedMode  = previewMode;
+
+  const rows = overlay.querySelectorAll('.bios-row');
+  const liveLabel = overlay.querySelector('#bios-live-label');
+
+  function highlight(idx) {
+    rows.forEach((r, i) => {
+      const isActive = i === idx;
+      r.classList.toggle('focused', isActive);
+      r.querySelector('.bios-arrow').style.visibility = isActive ? 'visible' : 'hidden';
+    });
+    focusedIndex = idx;
+    previewTheme = themeKeys[idx];
+    liveLabel.textContent = `${previewTheme.toUpperCase()} / ${previewMode.toUpperCase()}`;
+    applyTheme(previewTheme, previewMode);
+  }
+
+  function setMode(m) {
+    previewMode = m;
+    overlay.querySelectorAll('.bios-mode-btn').forEach(b => {
+      b.classList.toggle('selected', b.dataset.mode === m);
+    });
+    liveLabel.textContent = `${previewTheme.toUpperCase()} / ${previewMode.toUpperCase()}`;
+    applyTheme(previewTheme, previewMode);
+  }
+
+  const currentIdx = themeKeys.indexOf(savedTheme);
+  highlight(currentIdx >= 0 ? currentIdx : 0);
+  setMode(savedMode);
+
+  rows.forEach((r, i) => {
+    r.addEventListener('mouseenter', () => highlight(i));
+    r.addEventListener('click', () => highlight(i));
+  });
+
+  overlay.querySelectorAll('.bios-mode-btn').forEach(b => {
+    b.addEventListener('click', () => setMode(b.dataset.mode));
+  });
+
+  function onKey(e) {
+    if (e.key === 'ArrowDown') { e.preventDefault(); highlight((focusedIndex+1) % themeKeys.length); }
+    if (e.key === 'ArrowUp')   { e.preventDefault(); highlight((focusedIndex-1+themeKeys.length) % themeKeys.length); }
+    if (e.key === 'F10')       { e.preventDefault(); close(true); }
+    if (e.key === 'Escape')    { close(false); }
+  }
+  document.addEventListener('keydown', onKey);
+
+  function close(save) {
+    document.removeEventListener('keydown', onKey);
+    if (!save) applyTheme(savedTheme, savedMode);
+    overlay.remove();
+  }
+
+  overlay.addEventListener('click', e => {
+    if (e.target === overlay) close(true);
+  });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const sections = document.querySelectorAll('main section');
+  enableImageZoom();
+  resizeContent();
 
   const scrollToSlide = (index) => {
     const total = sections.length;
@@ -30,80 +162,60 @@ document.addEventListener("DOMContentLoaded", () => {
     repositionToggleButton();
   };
 
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "ArrowDown" || e.key === "ArrowRight") {
-      scrollToSlide(slide_index + 1);
-    } else if (e.key === "ArrowUp" || e.key === "ArrowLeft") {
-      scrollToSlide(slide_index - 1);
-    }
+  document.addEventListener('keydown', (e) => {
+    if (document.getElementById('bios-overlay')) return;
+    if (e.key === 'ArrowDown' || e.key === 'ArrowRight') scrollToSlide(slide_index + 1);
+    else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') scrollToSlide(slide_index - 1);
   });
 
-  const toggleBtn = document.createElement("button");
-  toggleBtn.textContent = "Toggle Theme";
-  toggleBtn.className = "theme-toggle";
+  const toggleBtn = document.createElement('button');
+  toggleBtn.textContent = '[THEME]';
+  toggleBtn.className = 'theme-toggle';
   document.body.appendChild(toggleBtn);
   let toggleBtnLeftPos = toggleBtn.getBoundingClientRect().left;
 
   const repositionToggleButton = () => {
     const currentSection = sections[slide_index];
-    const header = currentSection.querySelector("header");
-    const title = header?.querySelector("h3");
-
-    if (!header || !title) {
-        toggleBtn.style.display = "block";
-        return;
-    }
-
-    const titleRect = title.getBoundingClientRect();
+    const header = currentSection?.querySelector('header');
+    const title  = header?.querySelector('h3');
+    if (!header || !title) { toggleBtn.style.display = 'block'; return; }
+    const titleRect  = title.getBoundingClientRect();
     const toggleRect = toggleBtn.getBoundingClientRect();
-
-    const isOverlapping = (
-      titleRect.right + 16 > window.innerWidth ||
-      titleRect.right > (toggleRect.left || toggleBtnLeftPos)
-    );
-
-    toggleBtn.style.display = isOverlapping ? "none" : "block";
-
-    if (toggleRect.left !== 0) {
-      toggleBtnLeftPos = toggleRect.left;
-    }
+    const isOverlapping = titleRect.right + 16 > window.innerWidth
+      || titleRect.right > (toggleRect.left || toggleBtnLeftPos);
+    toggleBtn.style.display = isOverlapping ? 'none' : 'block';
+    if (toggleRect.left !== 0) toggleBtnLeftPos = toggleRect.left;
   };
 
-  const applyTheme = (theme) => {
-    document.body.classList.remove("dark", "light");
-    document.body.classList.add(theme);
-    localStorage.setItem("theme", theme);
-  };
+  const params = new URLSearchParams(window.location.search);
+  const urlTheme = params.get('theme');
+  const urlMode  = params.get('mode');
+  if (urlTheme && themes[urlTheme]) {
+    applyTheme(urlTheme, urlMode || 'dark');
+  } else {
+    const saved = localStorage.getItem('theme') || 'hacker';
+    const savedMode = localStorage.getItem('mode') || 'dark';
+    applyTheme(saved, savedMode);
+  }
 
-  const savedTheme = localStorage.getItem("theme");
-  applyTheme(savedTheme || "dark");
-
-  toggleBtn.addEventListener("click", () => {
-    const newTheme = document.body.classList.contains("dark") ? "light" : "dark";
-    applyTheme(newTheme);
-  });
-
-  window.addEventListener("resize", repositionToggleButton);
+  toggleBtn.addEventListener('click', buildBiosPopup);
+  window.addEventListener('resize', repositionToggleButton);
 
   let scrollTimeout;
-  document.querySelector("main").addEventListener("scroll", () => {
+  document.querySelector('main').addEventListener('scroll', () => {
     clearTimeout(scrollTimeout);
     scrollTimeout = setTimeout(() => {
-      let closest = 0;
-      let minDiff = Infinity;
+      let closest = 0, minDiff = Infinity;
       sections.forEach((sec, i) => {
         const diff = Math.abs(sec.getBoundingClientRect().top);
-        if (diff < minDiff) {
-          minDiff = diff;
-          closest = i;
-        }
+        if (diff < minDiff) { minDiff = diff; closest = i; }
       });
       slide_index = closest;
     }, 100);
   });
 });
 
-document.addEventListener('DOMContentLoaded', () => {
+const resizeContent = () => {
   const slides = document.querySelectorAll('.content-slide, .table-content');
 
   slides.forEach(slide => {
@@ -129,7 +241,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const maxArticleSize = slide.clientHeight - dynamicBuffer;
 
     const img = article.querySelector('img');
-    if (img !== null) {
+    if (img !== null && !article.classList.contains('image-only')) {
       img.style.setProperty('--max-article-size', `${maxArticleSize - 100}px`);
       void img.offsetWidth;
     }
@@ -165,7 +277,7 @@ document.addEventListener('DOMContentLoaded', () => {
       article.style.webkitOverflowScrolling = 'touch';
     }
   });
-});
+};
 
 const scenarios = [
   {
@@ -634,6 +746,46 @@ document.addEventListener("DOMContentLoaded", () => {
         "Focused on real-world scenarios where standard defenses fall short and how attackers exploit them.",
         "Promoted hands-on understanding of purple team techniques, defense evasion, and the importance of layered security."
       ]
+    },
+    {
+      "name": "Contributor to the Emergence of Purple Team Practices",
+      "title": "Purple Team Advocacy & Knowledge Sharing",
+      "period": "2025 - Present",
+      "version": "Security.Insider",
+      "tags": ["Purple Team", "Cybersecurity", "Defense", "Security Governance", "Conference", "Awareness"],
+      "details": [
+        "Talks and conferences on Purple Team approaches.",
+        "Engagements with cybersecurity governance stakeholders within organizations.",
+        "Contribution to the dissemination of Purple Team practices to improve the quality of defensive security."
+      ]
+    },
+    {
+      "name": "Freelance Cybersecurity Trainer",
+      "title": "Defensive Security Training & Certification",
+      "period": "2025 - Present",
+      "version": "Security.Mentor",
+      "tags": ["Cybersecurity Training", "Defensive Security", "Best Practices", "Certification"],
+      "details": [
+        "Provided freelance training in defensive cybersecurity.",
+        "Helped clients improve the quality of their security practices.",
+        "Introduced new approaches to strengthen defensive strategies.",
+        "Shared best practices and practical skills.",
+        "Acted as an examiner for defensive cybersecurity certification exams."
+      ]
+    },
+    {
+      "name": "Bug Hunter",
+      "title": "Web Vulnerability Research (CVE Discoveries)",
+      "period": "2026",
+      "version": "Security.Researcher",
+      "tags": ["Web Security", "Vulnerability Research", "CVE", "Injection", "RCE"],
+      "details": [
+        "Vulnerability research conducted within a dedicated project.",
+        "Discovered multiple HIGH and CRITICAL CVEs in web applications.",
+        "Identified injection vulnerabilities in authenticated contexts.",
+        "Exploited vulnerabilities leading to access to sensitive data (e.g. hashed passwords).",
+        "Achieved remote code execution (RCE) through exploitation."
+      ]
     }
   ];
 
@@ -649,15 +801,26 @@ document.addEventListener("DOMContentLoaded", () => {
 
   let currentIndex = 0;
 
+  function measureCharWidth(element) {
+    const span = document.createElement("span");
+    span.textContent = "W";
+    span.style.visibility = "hidden";
+    element.appendChild(span);
+
+    const width = span.getBoundingClientRect().width;
+    element.removeChild(span);
+    return width;
+  }
+
   const drawProgressBar = (current, total) => {
     const percent = Math.round((current / total) * 100);
 
     const progressElement = document.getElementById("timeline-progress");
     const availableWidth = progressElement.getBoundingClientRect().width;
 
-    const fontSize = parseFloat(getComputedStyle(progressElement).fontSize);
-    const charWidth = fontSize * 0.55;
-    const barLength = Math.floor((availableWidth - 10 * charWidth) / charWidth);
+    // const fontSize = parseFloat(getComputedStyle(progressElement).fontSize);
+    const charWidth = measureCharWidth(progressElement); // fontSize * 0.55;
+    const barLength = Math.floor(availableWidth / charWidth) - 8; // Math.floor((availableWidth - 10 * charWidth) / charWidth);
 
     const filledLength = Math.round((percent / 100) * barLength);
     const bar = `[${"#".repeat(filledLength)}${".".repeat(barLength - filledLength)}] ${percent}%`;
@@ -700,4 +863,253 @@ document.addEventListener("DOMContentLoaded", () => {
       displayEvent();
     }
   });
+
 });
+
+// index.html?theme=hacker&mode=dark
+// index.html?theme=hacker&mode=light&bgcolordark=%23000000&textcolordark=%23ff0000&fontfamily=Arial
+// index.html?theme=retro&mode=dark&bgcolorlight=%23ffffff&textcolorlight=%230000ff
+// updateTheme({"theme": "hacker", "mode": "dark"})
+// updateTheme({"theme": "hacker", "mode": "light", "bgcolordark": "#000000", "textcolordark": "#ff0000", "fontfamily": "Arial"})
+// updateTheme({"theme": "retro", "mode": "dark", "bgcolorlight": "#000000", "textcolorlight": "#ff0000"})
+
+const themes = {
+  hacker: {
+    dark: {
+      bgColor: '#0d0d0d',
+      textColor: '#00ff00',
+    },
+    light: {
+      bgColor: '#ffffff',
+      textColor: '#003300',
+    },
+    fontFamily: "'Courier New', Courier, monospace",
+    transitionSpeed: '0.5s',
+  },
+  retro: {
+    dark: {
+      bgColor: '#1a1a1a',
+      textColor: '#ff00ff',
+    },
+    light: {
+      bgColor: '#f0f0f0',
+      textColor: '#660066',
+    },
+    fontFamily: "'Lucida Console', Monaco, monospace",
+    transitionSpeed: '0.5s',
+  },
+  htb: {
+    dark: {
+      bgColor: '#141d2b',
+      textColor: '#9fef00',
+    },
+    light: {
+      bgColor: '#ffffff',
+      textColor: '#404040',
+    },
+    fontFamily: "'Open Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif",
+    transitionSpeed: '0.5s',
+  },
+  ctf: {
+    dark: {
+      bgColor: '#1e1e1e',
+      textColor: '#ffcc00',
+    },
+    light: {
+      bgColor: '#f2f2f2',
+      textColor: '#1f1f1f',
+    },
+    fontFamily: "'Roboto Mono', monospace",
+    transitionSpeed: '0.5s',
+  },
+  cybersecurity: {
+    dark: {
+      bgColor: '#0a0a0a',
+      textColor: '#00c0f0',
+    },
+    light: {
+      bgColor: '#ffffff',
+      textColor: '#0077aa',
+    },
+    fontFamily: "'Inconsolata', monospace",
+    transitionSpeed: '0.5s',
+  },
+  gaming: {
+    dark: {
+      bgColor: '#222222',
+      textColor: '#ff5500',
+    },
+    light: {
+      bgColor: '#eeeeee',
+      textColor: '#ff3333',
+    },
+    fontFamily: "'Press Start 2P', cursive",
+    transitionSpeed: '0.6s',
+  },
+  darkweb: {
+    dark: {
+      bgColor: '#121212',
+      textColor: '#c0c0c0',
+    },
+    light: {
+      bgColor: '#333333',
+      textColor: '#aaaaaa',
+    },
+    fontFamily: "'Monaco', monospace",
+    transitionSpeed: '0.5s',
+  },
+  neon: {
+    dark: {
+      bgColor: '#1a1a1a',
+      textColor: '#00ffcc',
+    },
+    light: {
+      bgColor: '#ffffff',
+      textColor: '#ff0099',
+    },
+    fontFamily: "'Courier New', monospace",
+    transitionSpeed: '0.5s',
+  },
+  matrix: {
+    dark: {
+      bgColor: '#000000',
+      textColor: '#00ff00',
+    },
+    light: {
+      bgColor: '#f0f0f0',
+      textColor: '#333333',
+    },
+    fontFamily: "'Matrix', monospace",
+    transitionSpeed: '0.5s',
+  },
+  governanceCyber: {
+    dark: {
+      bgColor: '#1c1c1c',
+      textColor: '#00b0b9',
+    },
+    light: {
+      bgColor: '#f9f9f9',
+      textColor: '#2a2a2a',
+    },
+    fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
+    transitionSpeed: '0.5s',
+  },
+  gnome: {
+    dark: {
+      bgColor: '#2e3436',
+      textColor: '#8ae135',
+    },
+    light: {
+      bgColor: '#fcfcfc',
+      textColor: '#56bcad',
+    },
+    fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
+    transitionSpeed: '0.5s',
+  },
+  yaru: {
+    dark: {
+      bgColor: '#262626',
+      textColor: '#fbc16a',
+    },
+    light: {
+      bgColor: '#fcfcfc',
+      textColor: '#0e8420',
+    },
+    fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
+    transitionSpeed: '0.5s',
+  },
+  solarise: {
+    dark: {
+      bgColor: '#002b36',
+      textColor: '#b58900',
+    },
+    light: {
+      bgColor: '#fdf6e3',
+      textColor: '#b58900',
+    },
+    fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
+    transitionSpeed: '0.5s',
+  },
+  purple: {
+    dark: {
+      bgColor: '#2c003e',
+      textColor: '#d100d1',
+    },
+    light: {
+      bgColor: '#e8c1e8',
+      textColor: '#660066',
+    },
+    fontFamily: "Roboto, Arial, sans-serif",
+    transitionSpeed: '0.5s',
+  },
+  RoyalAmethyst: {
+    dark: {
+      bgColor: '#1a0f2e',
+      textColor: '#ff8c00',
+    },
+    light: {
+      bgColor: '#ede7ff',
+      textColor: '#2a0e55',
+    },
+    fontFamily: "Roboto, Arial, sans-serif",
+    transitionSpeed: '0.5s',
+  },
+  matrix2: {
+    dark:  { bgColor: '#001100', textColor: '#39ff14' },
+    light: { bgColor: '#e8ffe8', textColor: '#005500' },
+    fontFamily: "'Courier New', Courier, monospace",
+    transitionSpeed: '0.3s',
+  },
+  phantom: {
+    dark:  { bgColor: '#0a0010', textColor: '#bf00ff' },
+    light: { bgColor: '#f5eaff', textColor: '#5a007a' },
+    fontFamily: "'Lucida Console', Monaco, monospace",
+    transitionSpeed: '0.5s',
+  },
+  terminal: {
+    dark:  { bgColor: '#0c0c0c', textColor: '#ffb300' },
+    light: { bgColor: '#fffbf0', textColor: '#7a5000' },
+    fontFamily: "'Courier New', Courier, monospace",
+    transitionSpeed: '0.4s',
+  },
+};
+
+function openCodePopup(btn) {
+  const code = btn.dataset.code;
+  const lang = btn.dataset.lang;
+  document.getElementById('code-popup-lang').textContent =
+    lang ? '[ ' + lang.toUpperCase() + ' ]' : '[ CODE ]';
+  document.getElementById('code-popup-code').textContent = code;
+  document.getElementById('code-popup-overlay').style.display = 'flex';
+}
+function closeCodePopup() {
+  document.getElementById('code-popup-overlay').style.display = 'none';
+}
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeCodePopup();
+});
+
+function enableImageZoom() {
+  document.querySelectorAll('section.content-slide img').forEach(img => {
+    img.style.cursor = "zoom-in";
+
+    img.addEventListener('click', () => {
+      const existing = document.querySelector('.image-zoom-overlay');
+      if (existing) existing.remove();
+
+      const overlay = document.createElement('div');
+      overlay.className = 'image-zoom-overlay';
+
+      const zoomedImg = document.createElement('img');
+      zoomedImg.src = img.src;
+
+      overlay.appendChild(zoomedImg);
+
+      document.body.appendChild(overlay);
+
+      overlay.addEventListener('click', () => {
+        overlay.remove();
+      });
+    });
+  });
+}
