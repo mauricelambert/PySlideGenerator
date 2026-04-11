@@ -18,6 +18,10 @@
 */
 
 let slide_index = 0;
+let sections = [];
+let sections_length = 0;
+const toggleBtn = document.createElement('button');
+let toggleBtnLeftPos;
 
 const applyTheme = (themeName, mode) => {
   const theme = themes[themeName];
@@ -149,18 +153,32 @@ function buildBiosPopup() {
   });
 }
 
+const scrollToSlide = (index, smooth = true) => {
+  const newIndex = ((index % sections_length) + sections_length) % sections_length;
+  sections[newIndex].scrollIntoView(smooth ? { behavior: 'smooth' } : {});
+  if (typeof broadcastSlide === 'function' && slide_index !== newIndex) broadcastSlide(newIndex);
+  slide_index = newIndex;
+  repositionToggleButton();
+};
+
+const repositionToggleButton = () => {
+  const currentSection = sections[slide_index];
+  const header = currentSection?.querySelector('header');
+  const title  = header?.querySelector('h3');
+  if (!header || !title) { toggleBtn.style.display = 'block'; return; }
+  const titleRect  = title.getBoundingClientRect();
+  const toggleRect = toggleBtn.getBoundingClientRect();
+  const isOverlapping = titleRect.right + 16 > window.innerWidth
+    || titleRect.right > (toggleRect.left || toggleBtnLeftPos);
+  toggleBtn.style.display = isOverlapping ? 'none' : 'block';
+  if (toggleRect.left !== 0) toggleBtnLeftPos = toggleRect.left;
+};
+
 document.addEventListener('DOMContentLoaded', () => {
-  const sections = document.querySelectorAll('main section');
+  sections = document.querySelectorAll('main section');
+  sections_length = sections.length;
   enableImageZoom();
   resizeContent();
-
-  const scrollToSlide = (index) => {
-    const total = sections.length;
-    const newIndex = ((index % total) + total) % total;
-    sections[newIndex].scrollIntoView({ behavior: 'smooth' });
-    slide_index = newIndex;
-    repositionToggleButton();
-  };
 
   document.addEventListener('keydown', (e) => {
     if (document.getElementById('bios-overlay')) return;
@@ -168,24 +186,10 @@ document.addEventListener('DOMContentLoaded', () => {
     else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') scrollToSlide(slide_index - 1);
   });
 
-  const toggleBtn = document.createElement('button');
   toggleBtn.textContent = '[THEME]';
   toggleBtn.className = 'theme-toggle';
   document.body.appendChild(toggleBtn);
-  let toggleBtnLeftPos = toggleBtn.getBoundingClientRect().left;
-
-  const repositionToggleButton = () => {
-    const currentSection = sections[slide_index];
-    const header = currentSection?.querySelector('header');
-    const title  = header?.querySelector('h3');
-    if (!header || !title) { toggleBtn.style.display = 'block'; return; }
-    const titleRect  = title.getBoundingClientRect();
-    const toggleRect = toggleBtn.getBoundingClientRect();
-    const isOverlapping = titleRect.right + 16 > window.innerWidth
-      || titleRect.right > (toggleRect.left || toggleBtnLeftPos);
-    toggleBtn.style.display = isOverlapping ? 'none' : 'block';
-    if (toggleRect.left !== 0) toggleBtnLeftPos = toggleRect.left;
-  };
+  toggleBtnLeftPos = toggleBtn.getBoundingClientRect().left;
 
   const params = new URLSearchParams(window.location.search);
   const urlTheme = params.get('theme');
@@ -211,6 +215,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (diff < minDiff) { minDiff = diff; closest = i; }
       });
       slide_index = closest;
+      if (typeof broadcastSlide === 'function') broadcastSlide(closest);
     }, 100);
   });
 });
@@ -1112,4 +1117,18 @@ function enableImageZoom() {
       });
     });
   });
+}
+
+const _bc = new BroadcastChannel('presentation_sync');
+
+_bc.onmessage = (e) => {
+  if (e.data?.type === 'slide_change' && typeof e.data.index === 'number') {
+    console.log(slide_index, e.data.index);
+    slide_index = e.data.index;
+    scrollToSlide(e.data.index, false);
+  }
+};
+
+function broadcastSlide(index) {
+  _bc.postMessage({ type: 'slide_change', index });
 }
