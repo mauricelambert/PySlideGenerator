@@ -419,6 +419,34 @@ h1, h2, h3 {
 }
 .bios-footer kbd { color: var(--accent); }
 
+#bios-theme-list {
+  max-height: calc(100vh - 250px);
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+#bios-theme-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+#bios-theme-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+#bios-theme-list::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 3px;
+}
+
+#bios-theme-list::-webkit-scrollbar-thumb:hover {
+  background: #aaa;
+}
+
+#bios-theme-list {
+  scrollbar-width: thin;
+  scrollbar-color: #888 transparent;
+}
+
 #code-popup-overlay {
   position: fixed; inset: 0;
   background: rgba(0,0,0,0.82);
