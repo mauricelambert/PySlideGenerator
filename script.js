@@ -105,6 +105,12 @@ function buildBiosPopup() {
       const isActive = i === idx;
       r.classList.toggle('focused', isActive);
       r.querySelector('.bios-arrow').style.visibility = isActive ? 'visible' : 'hidden';
+      if (isActive) {
+        r.scrollIntoView({
+          block: 'nearest',
+          behavior: 'smooth'
+        });
+      }
     });
     focusedIndex = idx;
     previewTheme = themeKeys[idx];
@@ -1077,6 +1083,18 @@ const themes = {
     fontFamily: "'Courier New', Courier, monospace",
     transitionSpeed: '0.4s',
   },
+    dsomm1: {
+    dark:  { bgColor: '#303030', textColor: '#e8e8e8' },
+    light: { bgColor: '#e8e8e8', textColor: '#303030' },
+    fontFamily: "Roboto, Arial, sans-serif",
+    transitionSpeed: '0.5s',
+  },
+  dsomm2: {
+    dark:  { bgColor: '#303030', textColor: '#4caf50' },
+    light: { bgColor: '#4caf50', textColor: '#303030' },
+    fontFamily: "Roboto, Arial, sans-serif",
+    transitionSpeed: '0.5s',
+  }
 };
 
 function openCodePopup(btn) {
