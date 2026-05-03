@@ -23,7 +23,7 @@
 little GUI to generate my slides
 """
 
-__version__ = "2.0.0"
+__version__ = "2.0.1"
 __author__ = "Maurice Lambert"
 __author_email__ = "mauricelambert434@gmail.com"
 __maintainer__ = "Maurice Lambert"
@@ -760,7 +760,7 @@ template = Template(
     ${slides}
     <section class="timeline-slide content-slide" id="timeline-slide">
       <header>
-        <img src="https://mauricelambert.github.io/MauriceLambert.png" alt="MauriceLambert icon" />
+        <img src="https://mauricelambert.github.io/MauriceLambert.png" alt="Metallic serpent dragon logo in red to purple gradient symbolizing offensive power, high quality, mythic strength and Python-inspired security defense" />
         <h3>My path, my passion: cybersecurity</h3>
       </header>
       <article>
@@ -830,25 +830,32 @@ class SlideGeneratorApp:
         self.root = root
         self.root.title("Slide Editor")
         self.root.geometry("800x600")
-        self.data = {
-            "title": "",
-            "keywords": [],
-            "description": "",
-            "author": "Maurice Lambert",
-            "default icon": "https://mauricelambert.github.io/MauriceLambert.png",
-            "default icon alt": "MauriceLambert icon",
-            "default aside": (
-                'References: <a href="https://github.com/mauricelambert/">Github MauriceLambert</a>, '
-                '<a href="https://mauricelambert.github.io/">MauriceLambert WebSite</a>.'
-            ),
-            "slides": [],
-        }
+        self.data = self.get_default_data()
         self.file_path = None
         self.export_path = None
         self.modified = False
         self.setup_ui()
         self.populate_fields()
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
+
+    @staticmethod
+    def get_default_data() -> Dict[str, str]:
+        return {
+            "title": "",
+            "keywords": [],
+            "description": "",
+            "author": "Maurice Lambert",
+            "default icon": "https://mauricelambert.github.io/MauriceLambert.png",
+            "default icon alt": (
+                "Metallic serpent dragon logo in red to purple gradient symbolizing offensive power,"
+                " high quality, mythic strength and Python-inspired security defense"
+            ),
+            "default aside": (
+                'References: <a href="https://github.com/mauricelambert/">Github MauriceLambert</a>, '
+                '<a href="https://mauricelambert.github.io/">MauriceLambert WebSite</a>.'
+            ),
+            "slides": [],
+        }
 
     def setup_ui(self) -> None:
         """Create the main UI page."""
@@ -930,17 +937,7 @@ class SlideGeneratorApp:
 
     def new_file(self) -> None:
         self.file_path = None
-        self.data = {
-            "title": "", "keywords": [], "description": "",
-            "author": "Maurice Lambert",
-            "default icon": "https://mauricelambert.github.io/MauriceLambert.png",
-            "default icon alt": "MauriceLambert icon",
-            "default aside": (
-                'References: <a href="https://github.com/mauricelambert/">Github MauriceLambert</a>, '
-                '<a href="https://mauricelambert.github.io/">MauriceLambert WebSite</a>.'
-            ),
-            "slides": [],
-        }
+        self.data = self.get_default_data()
         for key in self.entries:
             self.entries[key].delete(0, END)
         for entry in self.keyword_entries:
@@ -999,8 +996,8 @@ class SlideGeneratorApp:
         for index, slide in enumerate(self.data["slides"]):
             slide_html_index = index + 3
             slide_type = slide["type"]
-            icon_alt   = slide.get("icon alt", slide.get("icon", ""))
-            image_alt  = slide.get("image alt", slide.get("image", ""))
+            icon_alt   = slide.get("icon alt", self.data.get("default icon alt", ""))
+            image_alt  = slide.get("image alt", "")
 
             if slide_type in ("content", "content-left"):
                 texts_html = ""
@@ -1213,7 +1210,7 @@ class SlideGeneratorApp:
             slide = {
                 "type": slide_type,
                 "icon": self.data["default icon"],
-                "icon alt": self.data.get("default icon alt", ""),
+                "icon alt": self.data["default icon alt"],
                 "title": "",
                 "notes": [],
             }
@@ -1302,7 +1299,7 @@ class SlideGeneratorApp:
 
         dialog = Toplevel(self.root)
         dialog.title("Edit Slide")
-        dialog.geometry("620x640")
+        dialog.geometry("640x660")
         dialog.configure(bg="#2e2e2e")
 
         slide_type = slide["type"]
