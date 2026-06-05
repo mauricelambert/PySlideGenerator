@@ -23,7 +23,7 @@
 little GUI to generate my slides
 """
 
-__version__ = "2.0.1"
+__version__ = "3.0.0"
 __author__ = "Maurice Lambert"
 __author_email__ = "mauricelambert434@gmail.com"
 __maintainer__ = "Maurice Lambert"
@@ -68,11 +68,15 @@ from tkinter import (
 )
 from tkinter.messagebox import showerror, showinfo, showwarning, askokcancel
 from tkinter.filedialog import askopenfilename, asksaveasfilename
-from os.path import join, dirname, splitext, basename
+from os.path import join, dirname, splitext, basename, abspath
+from tempfile import TemporaryDirectory
+from webbrowser import open as webopen
 from typing import Dict, List, Union
 from json import dump, load, dumps
 from string import Template
+from shutil import copy2
 from html import escape
+from os import mkdir
 
 notes_template = Template(
     """<!DOCTYPE html>
@@ -822,11 +826,14 @@ SLIDE_TYPES = [
 ]
 
 SLIDE_TYPE_LABELS = {k: lbl for lbl, k in SLIDE_TYPES}
+WORDS_PER_MINUTE = 110
 
 class SlideGeneratorApp:
     """Main class: manages GUI, data and file I/O."""
 
     def __init__(self, root: Tk):
+        self.filtered_slide_indexes = []
+        self.section_indexes = []
         self.root = root
         self.root.title("Slide Editor")
         self.root.geometry("800x600")
@@ -867,12 +874,22 @@ class SlideGeneratorApp:
         file_menu.add_command(label="Open (Ctrl+O)", command=self.load_file)
         file_menu.add_command(label="Save (Ctrl+S)", command=self.save_file)
         file_menu.add_command(label="Generate (Ctrl+G)", command=self.generate_slides)
+        file_menu.add_command(label="Validate (Ctrl+V)", command=self.validate_slides)
         file_menu.add_separator()
         file_menu.add_command(label="Exit (Ctrl+Q)", command=self.on_close)
         menu_bar.add_cascade(label="File", menu=file_menu)
         self.root.config(menu=menu_bar)
 
-        scroll_frame = ScrollableFrame(self.root)
+        main_container = Frame(self.root, bg="#2e2e2e")
+        main_container.pack(fill="both", expand=True)
+
+        left_panel = Frame(main_container, bg="#2e2e2e")
+        left_panel.pack(side="left", fill="both", expand=True)
+
+        right_panel = Frame(main_container, bg="#2e2e2e")
+        right_panel.pack(side="right", fill="y")
+
+        scroll_frame = ScrollableFrame(left_panel)
         scroll_frame.pack(fill="both", expand=True, pady=10)
         self.main_frame = scroll_frame.scrollable_frame
 
@@ -882,10 +899,12 @@ class SlideGeneratorApp:
             "default icon", "default icon alt", "default aside",
         ]:
             Label(self.main_frame, text=field.capitalize(), bg="#2e2e2e", fg="#dd8a12").pack(anchor="w")
-            entry = Entry(self.main_frame, bg="#1e1e1e", fg="#dd8a12", insertbackground="#dd8a12")
+            entry = Entry(self.main_frame, bg="#1e1e1e", fg="#dd8a12", selectbackground="#dd8a12", selectforeground="#1e1e1e", insertbackground="#dd8a12")
             entry.pack(fill="x")
             entry.bind("<KeyRelease>", self.mark_modified)
             self.entries[field] = entry
+            if field == "title":
+                entry.bind("<KeyRelease>", lambda e: self.update_title(), add="+")
 
         Label(self.main_frame, text="Keywords", bg="#2e2e2e", fg="#dd8a12").pack(anchor="w")
         self.keyword_entries = []
@@ -893,9 +912,26 @@ class SlideGeneratorApp:
         self.keyword_frame.pack(fill="x", pady=5)
         self.add_keyword_entry()
 
-        Label(self.main_frame, text="Slides", bg="#2e2e2e", fg="#dd8a12").pack(anchor="w")
-        self.slides_listbox = Listbox(self.main_frame, bg="#1e1e1e", fg="#dd8a12")
-        self.slides_listbox.pack(fill="both", expand=True, pady=5)
+        Label(self.main_frame, text="Search slides", bg="#2e2e2e", fg="#dd8a12").pack(anchor="w")
+        self.slide_search_var = StringVar()
+        self.slide_search_var.trace_add("write", self.filter_slides)
+        self.slide_search_entry = Entry(self.main_frame, textvariable=self.slide_search_var,
+            bg="#1e1e1e", fg="#dd8a12", selectbackground="#dd8a12", selectforeground="#1e1e1e", insertbackground="#dd8a12"
+        )
+        self.slide_search_entry.pack(fill="x", pady=3)
+
+        self.progress_label = Label(self.main_frame, text="Progress: 0% | 0m", bg="#2e2e2e", fg="#dd8a12", font=("Courier New", 10))
+        self.progress_label.pack(anchor="w", pady=(5, 2))
+
+        # slides_container = Frame(self.main_frame, bg="#2e2e2e")
+        # slides_container.pack(fill="both", expand=True, pady=5)
+        Label(right_panel, text="Slides", bg="#2e2e2e", fg="#dd8a12").pack(anchor="w")
+        self.slides_listbox = Listbox(right_panel, bg="#1e1e1e", fg="#dd8a12", selectbackground="#dd8a12", selectforeground="#1e1e1e")
+        self.slides_listbox.pack(fill="both", expand=True, padx=5, pady=5)
+
+        Label(self.main_frame, text="Sections", bg="#2e2e2e", fg="#dd8a12").pack(anchor="w")
+        self.section_listbox = Listbox(self.main_frame, width=28, bg="#151515", fg="#66ff66", selectbackground="#66ff66", selectforeground="#151515", exportselection=False)
+        self.section_listbox.pack(fill="x", pady=5)
 
         btn_frame = Frame(self.main_frame, bg="#2e2e2e")
         btn_frame.pack(fill="x")
@@ -905,12 +941,380 @@ class SlideGeneratorApp:
         Button(btn_frame, text="Remove Selected Slide",command=self.remove_selected_slide,  **btn_cfg).pack(side="left", padx=5, pady=5)
         Button(btn_frame, text="Move Up",              command=self.move_slide_up,          **btn_cfg).pack(side="left", padx=5, pady=5)
         Button(btn_frame, text="Move Down",            command=self.move_slide_down,        **btn_cfg).pack(side="left", padx=5, pady=5)
+        Button(btn_frame, text="Preview",              command=self.preview_html,           **btn_cfg).pack(side="left", padx=5, pady=5)
 
         self.root.bind("<Control-s>", lambda e: self.save_file())
         self.root.bind("<Control-o>", lambda e: self.load_file())
         self.root.bind("<Control-n>", lambda e: self.new_file())
         self.root.bind("<Control-q>", lambda e: self.on_close())
         self.root.bind("<Control-g>", lambda e: self.generate_slides())
+        self.root.bind("<Control-v>", lambda e: self.validate_slides())
+
+        self.section_listbox.bind("<Double-Button-1>", self.jump_to_section)
+        self.section_listbox.bind("<<ListboxSelect>>", self.jump_to_section)
+        self.slides_listbox.bind("<<ListboxSelect>>", lambda e: self.sync_section_selection())
+        self.slides_listbox.bind("<Double-Button-1>", lambda e: self.edit_selected_slide())
+        self.slides_listbox.bind("<Return>", lambda e: self.edit_selected_slide())
+
+        self.slides_listbox.bind("<Up>", self.on_slide_list_up)
+        self.slides_listbox.bind("<Down>", self.on_slide_list_down)
+
+    def build_html(self) -> str:
+        self.update_data_from_fields()
+
+        slides_html = ""
+        titles = ""
+        last_subtitle = ""
+        last_subtitle_index = 3
+        table_of_content = ""
+
+        for index, slide in enumerate(self.data["slides"]):
+            slide_html_index = index + 3
+            slide_type = slide["type"]
+
+            icon_alt = slide.get("icon alt", self.data.get("default icon alt", ""))
+            image_alt = slide.get("image alt", "")
+
+            if slide_type in ("content", "content-left"):
+                texts_html = ""
+                for text in slide.get("texts", []):
+                    if text["type"] == "p":
+                        texts_html += paragraph.safe_substitute(content=text["content"])
+                    else:
+                        list_content = "".join(
+                            list_element.safe_substitute(content=el)
+                            for el in text["content"]
+                        )
+                        if text["type"] == "ul":
+                            texts_html += bullet_points.safe_substitute(list_content=list_content)
+                        elif text["type"] == "ol":
+                            texts_html += ordered_list.safe_substitute(list_content=list_content)
+
+                has_code = bool(slide.get("code", "").strip())
+                btn_html = ""
+                if has_code:
+                    btn_html = code_button_template.safe_substitute(
+                        code=escape(slide["code"]),
+                        lang=slide.get("code lang", "")
+                    )
+
+                tpl = content_image_left if slide_type == "content-left" else content
+                section_content = tpl.safe_substitute(
+                    icon=slide.get("icon", ""),
+                    icon_alt=icon_alt,
+                    title=slide.get("title", ""),
+                    text=texts_html,
+                    aside=slide.get("aside", ""),
+                    image=slide.get("image", ""),
+                    image_alt=image_alt,
+                    code_button=btn_html,
+                )
+
+                titles += table_of_content_content.safe_substitute(
+                    title=slide["title"], id=slide_html_index
+                )
+
+                class_name = "content-slide"
+
+            elif slide_type == "title":
+                if last_subtitle:
+                    table_of_content += table_of_content_subtitle.safe_substitute(
+                        title=last_subtitle,
+                        titles=titles,
+                        id=last_subtitle_index
+                    )
+                    titles = ""
+
+                last_subtitle = slide.get("title", "")
+                last_subtitle_index = slide_html_index
+
+                section_content = subtitle.safe_substitute(
+                    icon=slide.get("icon", ""),
+                    icon_alt=icon_alt,
+                    title=last_subtitle,
+                )
+                class_name = "subtitle-slide"
+
+            elif slide_type == "image-only":
+                section_content = content_image_only.safe_substitute(
+                    icon=slide.get("icon", ""),
+                    icon_alt=icon_alt,
+                    title=slide.get("title", ""),
+                    image=slide.get("image", ""),
+                    image_alt=image_alt,
+                    aside=slide.get("aside", ""),
+                )
+
+                titles += table_of_content_content.safe_substitute(
+                    title=slide.get("title", "(image)"),
+                    id=slide_html_index
+                )
+
+                class_name = "content-slide image-only-slide"
+
+            else:
+                continue
+
+            slides_html += section.safe_substitute(
+                index=str(slide_html_index),
+                class_name=class_name,
+                content=section_content,
+            )
+
+        if last_subtitle:
+            table_of_content += table_of_content_subtitle.safe_substitute(
+                title=last_subtitle,
+                titles=titles,
+                id=last_subtitle_index
+            )
+
+        return template.safe_substitute(
+            description=self.data.get("description", ""),
+            keywords=", ".join(self.data.get("keywords", [])),
+            title=self.data.get("title", ""),
+            default_icon=self.data.get("default icon", ""),
+            default_icon_alt=self.data.get("default icon alt", ""),
+            table_of_content=table_of_content,
+            slides=slides_html,
+            author=self.data.get("author", ""),
+            code_popup=code_popup_html.safe_substitute(),
+        )
+
+    def preview_html(self) -> None:
+        html = self.build_html()
+        tmp = NamedTemporaryFile(
+            delete=False,
+            suffix=".html",
+            mode="w",
+            encoding="utf-8"
+        )
+        tmp.write(html)
+        tmp.close()
+        webopen(f"file://{tmp.name}")
+
+    def preview_html(self) -> None:
+        html = self.build_html()
+        self._preview_dir = TemporaryDirectory()
+        preview_dir = self._preview_dir.name
+        html_dir = join(preview_dir, "preview")
+        html_path = join(html_dir, "preview.html")
+        mkdir(html_dir)
+
+        with open(html_path, "w", encoding="utf-8") as f:
+            f.write(html)
+
+        base_dir = dirname(abspath(__file__))
+        copy2(join(base_dir, "styles.css"), join(preview_dir, "styles.css"))
+        copy2(join(base_dir, "script.js"), join(preview_dir, "script.js"))
+        webopen(f"file://{html_path}")
+
+    def get_actual_slide_index(self, listbox_index: int) -> int:
+        if not self.filtered_slide_indexes:
+            return listbox_index
+        return self.filtered_slide_indexes[listbox_index]
+
+    def filter_slides(self, *_):
+        query = self.slide_search_var.get().lower().strip()
+
+        self.slides_listbox.delete(0, END)
+        self.filtered_slide_indexes = []
+
+        for i, slide in enumerate(self.data.get("slides", [])):
+            title = slide.get("title", "").lower()
+            slide_type = slide.get("type", "")
+
+            label = SLIDE_TYPE_LABELS.get(slide_type, slide_type)
+
+            text = f"{i+1}: [{label}] {slide.get('title','')}"
+
+            if not query or query in title or query in label:
+                self.slides_listbox.insert(END, text)
+                self.filtered_slide_indexes.append(i)
+
+        if self.slides_listbox.size() > 0:
+            self.slides_listbox.selection_set(0)
+            self.slides_listbox.activate(0)
+
+    def validate_slides(self) -> None:
+        warnings = []
+        invalid_indexes = set()
+
+        for index, slide in enumerate(self.data["slides"], start=1):
+            title = slide.get("title", "").strip()
+            if not title:
+                warnings.append(f"Slide {index}: missing title")
+                invalid_indexes.add(index - 1)
+
+            if slide["type"] in ("content", "content-left"):
+                if not slide.get("texts"):
+                    warnings.append(f"Slide {index}: no content")
+                    invalid_indexes.add(index - 1)
+                if not slide.get("image"):
+                    warnings.append(f"Slide {index}: no image")
+                    invalid_indexes.add(index - 1)
+
+            if slide["type"] == "image-only":
+                if not slide.get("image"):
+                    warnings.append(f"Slide {index}: no image")
+                    invalid_indexes.add(index - 1)
+
+        if invalid_indexes:
+            self.refresh_slide_colors(invalid_indexes)
+            first_invalid = min(invalid_indexes)
+            self.focus_slide(first_invalid)
+
+        if warnings:
+            showwarning("Validation", "\n".join(warnings))
+        else:
+            showinfo("Validation", "No issue detected.")
+
+    def estimate_slide_duration(self, slide: dict) -> int:
+        slide_type = slide.get("type", "")
+        if slide_type == "title":
+            return 10
+        if slide_type == "image-only":
+            return 15
+
+        words = 0
+        for block in slide.get("texts", []):
+            content = block.get("content", "")
+
+            if isinstance(content, str):
+                words += len(content.split())
+            elif isinstance(content, list):
+                for item in content:
+                    words += len(item.split())
+
+        reading_time = (words / 110) * 60
+        explanation_factor = 2.0
+        duration = reading_time * explanation_factor
+        return max(15, round(duration))
+
+    def get_total_duration(self) -> int:
+        return sum(
+            self.estimate_slide_duration(s)
+            for s in self.data.get("slides", [])
+        )
+
+    def format_duration(self, seconds: int) -> str:
+        minutes = seconds // 60
+        sec = seconds % 60
+        return f"{minutes}m {sec}s"
+
+    def update_progress(self) -> None:
+        slides = self.data.get("slides", [])
+        total = len(slides)
+
+        if total == 0:
+            self.progress_label.config(text="Progress: 0% | 0m")
+            return
+
+        current = self.slides_listbox.curselection()
+        current_index = current[0] if current else 0
+
+        percent = int((current_index + 1) / total * 100)
+
+        total_time = self.get_total_duration()
+        current_time = sum(
+            self.estimate_slide_duration(s)
+            for s in slides[:current_index + 1]
+        )
+
+        self.progress_label.config(
+            text=(
+                f"Progress: {percent}% | "
+                f"{self.format_duration(current_time)} / "
+                f"{self.format_duration(total_time)} "
+                f"| remaining {self.format_duration(self.get_remaining_duration())}"
+            )
+        )
+
+    def refresh_slide_colors(self, invalid_indexes):
+        self.slides_listbox.itemconfig(0, background="#1e1e1e")
+
+        for i in range(self.slides_listbox.size()):
+            self.slides_listbox.itemconfig(
+                i,
+                bg="#1e1e1e",
+                fg="#dd8a12"
+            )
+
+        for i in invalid_indexes:
+            self.slides_listbox.itemconfig(
+                i,
+                bg="#4a1010",
+                fg="#ff7070"
+            )
+
+    def on_slide_list_up(self, event=None):
+        count = self.slides_listbox.size()
+        if count == 0:
+            return "break"
+
+        selection = self.slides_listbox.curselection()
+        if not selection:
+            index = count - 1
+        elif selection[0] == 0:
+            index = count - 1
+        else:
+            index = selection[0] - 1
+
+        self.focus_slide(index)
+        return "break"
+
+    def on_slide_list_down(self, event=None):
+        count = self.slides_listbox.size()
+        if count == 0:
+            return "break"
+
+        selection = self.slides_listbox.curselection()
+        if not selection:
+            index = 0
+        elif selection[0] == count - 1:
+            index = 0
+        else:
+            index = selection[0] + 1
+
+        self.focus_slide(index)
+        return "break"
+
+    def update_title(self) -> None:
+        title = self.data.get("title", "").strip()
+        count = len(self.data.get("slides", []))
+        if title:
+            self.root.title(
+                f"Slide Editor - {title} ({count} slides)"
+            )
+        else:
+            self.root.title(
+                f"Slide Editor ({count} slides)"
+            )
+
+    def get_remaining_duration(self) -> int:
+        slides = self.data.get("slides", [])
+        current = self.slides_listbox.curselection()
+        idx = current[0] if current else 0
+        return sum(
+            self.estimate_slide_duration(s)
+            for s in slides[idx:]
+        )
+
+    def sync_section_selection(self):
+        selection = self.slides_listbox.curselection()
+        if not selection:
+            return
+
+        slide_index = selection[0]
+        current_section = 0
+        for i, section_slide in enumerate(self.section_indexes):
+            if section_slide <= slide_index:
+                current_section = i
+            else:
+                break
+
+        self.section_listbox.selection_clear(0, END)
+        self.section_listbox.selection_set(current_section)
+        self.section_listbox.see(current_section)
 
     def mark_modified(self, event: Event = None) -> None:
         self.modified = True
@@ -1149,25 +1553,57 @@ class SlideGeneratorApp:
 
 
     def populate_fields(self) -> None:
+        scroll_pos = self.slides_listbox.yview()[0]
+
         for key in self.entries:
             self.entries[key].delete(0, END)
             self.entries[key].insert(0, self.data.get(key, ""))
+
         for entry in self.keyword_entries:
             entry.destroy()
+
         self.keyword_entries.clear()
         for keyword in self.data.get("keywords", []):
-            entry = Entry(self.keyword_frame, bg="#1e1e1e", fg="#dd8a12", insertbackground="#dd8a12")
+            entry = Entry(self.keyword_frame, bg="#1e1e1e", fg="#dd8a12", selectbackground="#dd8a12", selectforeground="#1e1e1e", insertbackground="#dd8a12")
             entry.insert(0, keyword)
             entry.pack(fill="x", pady=2)
             entry.bind("<KeyRelease>", self.keyword_entry_updated)
             entry.bind("<KeyRelease>", self.mark_modified, add="+")
             self.keyword_entries.append(entry)
+
         self.add_keyword_entry()
         self.slides_listbox.delete(0, END)
         for idx, slide in enumerate(self.data.get("slides", [])):
             label = SLIDE_TYPE_LABELS.get(slide["type"], slide["type"])
             title = slide.get("title", "")
             self.slides_listbox.insert(END, f"{idx+1}: [{label}] {title}")
+
+        self.section_listbox.delete(0, END)
+        self.section_indexes.clear()
+        for idx, slide in enumerate(self.data.get("slides", [])):
+            if slide.get("type") == "title":
+                self.section_listbox.insert(
+                    END,
+                    slide.get("title", "(untitled)")
+                )
+                self.section_indexes.append(idx)
+
+        self.update_title()
+        self.update_progress()
+        self.slides_listbox.yview_moveto(scroll_pos)
+
+    def jump_to_section(self, event=None):
+        selection = self.section_listbox.curselection()
+        if not selection:
+            return
+
+        section_index = selection[0]
+        slide_index = self.section_indexes[section_index]
+        self.slides_listbox.selection_clear(0, END)
+        self.slides_listbox.selection_set(slide_index)
+        self.slides_listbox.activate(slide_index)
+        self.slides_listbox.see(slide_index)
+        self.update_progress()
 
     def update_data_from_fields(self) -> None:
         for key in self.entries:
@@ -1184,7 +1620,7 @@ class SlideGeneratorApp:
 
         Label(dialog, text="Position", bg="#2e2e2e", fg="#dd8a12").pack(pady=5)
         position_var = IntVar(value=len(self.data["slides"]) + 1)
-        Entry(dialog, textvariable=position_var, bg="#1e1e1e", fg="#dd8a12", insertbackground="#dd8a12").pack(fill="x", padx=10)
+        Entry(dialog, textvariable=position_var, bg="#1e1e1e", fg="#dd8a12", selectbackground="#dd8a12", selectforeground="#1e1e1e", insertbackground="#dd8a12").pack(fill="x", padx=10)
 
         Label(dialog, text="Type", bg="#2e2e2e", fg="#dd8a12").pack(pady=5)
         type_var = StringVar(value="content")
@@ -1234,9 +1670,15 @@ class SlideGeneratorApp:
             self.data["slides"].insert(pos - 1, slide)
             self.populate_fields()
 
-            self.slides_listbox.select_clear(0, END)
-            self.slides_listbox.select_set(pos - 1)
-            self.slides_listbox.activate(pos - 1)
+            self.focus_slide(pos - 1)
+            self.open_slide_editor(
+                self.data["slides"][pos - 1],
+                pos - 1
+            )
+
+            # self.slides_listbox.select_clear(0, END)
+            # self.slides_listbox.select_set(pos - 1)
+            # self.slides_listbox.activate(pos - 1)
 
             dialog.destroy()
             self.modified = True
@@ -1244,44 +1686,80 @@ class SlideGeneratorApp:
         Button(dialog, text="Add Slide", command=submit, bg="#1e1e1e", fg="#dd8a12",
                activebackground="#444444", activeforeground="#dd8a12").pack(pady=10)
 
+    def focus_slide(self, index: int) -> None:
+        self.slides_listbox.selection_clear(0, END)
+        self.slides_listbox.selection_set(index)
+        self.slides_listbox.activate(index)
+        self.slides_listbox.see(index)
+        self.update_progress()
+
     def edit_selected_slide(self) -> None:
         selection = self.slides_listbox.curselection()
         if not selection:
             showwarning("No selection", "Please select a slide to edit.")
             return
-        self.open_slide_editor(self.data["slides"][selection[0]], selection[0])
+
+        real_index = self.get_actual_slide_index(selection[0])
+        self.open_slide_editor(self.data["slides"][real_index], real_index)
 
     def remove_selected_slide(self) -> None:
         selection = self.slides_listbox.curselection()
+
         if not selection:
             showwarning("No selection", "Please select a slide to remove.")
             return
-        del self.data["slides"][selection[0]]
+
+        real_index = self.get_actual_slide_index(selection[0])
+        slide = self.data["slides"][real_index]
+
+        if not askokcancel("Delete slide", f'Delete "{slide.get("title", "(untitled)")}" ?'):
+            return
+
+        del self.data["slides"][real_index]
+
         self.populate_fields()
+
+        if self.data["slides"]:
+            self.focus_slide(
+                min(real_index, len(self.data["slides"]) - 1)
+            )
+
         self.modified = True
 
     def move_slide_up(self) -> None:
         selection = self.slides_listbox.curselection()
-        if not selection or selection[0] == 0:
+        if not selection:
             return
-        i = selection[0]
-        self.data["slides"][i - 1], self.data["slides"][i] = (
-            self.data["slides"][i], self.data["slides"][i - 1]
+        real_index = self.get_actual_slide_index(selection[0])
+
+        target = (
+            len(self.data["slides"]) - 1
+            if real_index == 0
+            else real_index - 1
+        )
+        self.data["slides"][real_index], self.data["slides"][target] = (
+            self.data["slides"][target], self.data["slides"][real_index]
         )
         self.populate_fields()
-        self.slides_listbox.select_set(i - 1)
+        self.focus_slide(target)
         self.modified = True
 
     def move_slide_down(self) -> None:
         selection = self.slides_listbox.curselection()
-        if not selection or selection[0] == len(self.data["slides"]) - 1:
+        if not selection:
             return
-        i = selection[0]
-        self.data["slides"][i + 1], self.data["slides"][i] = (
-            self.data["slides"][i], self.data["slides"][i + 1]
+        real_index = self.get_actual_slide_index(selection[0])
+
+        target = (
+            0
+            if i == len(self.data["slides"]) - 1
+            else i + 1
+        )
+        self.data["slides"][real_index], self.data["slides"][target] = (
+            self.data["slides"][target], self.data["slides"][real_index]
         )
         self.populate_fields()
-        self.slides_listbox.select_set(i + 1)
+        self.focus_slide(target)
         self.modified = True
 
     def open_slide_editor(
@@ -1298,7 +1776,11 @@ class SlideGeneratorApp:
             unsaved_slide = True
 
         dialog = Toplevel(self.root)
-        dialog.title("Edit Slide")
+        title = slide.get("title", "").strip()
+        if index is not None:
+            dialog.title(f"#{index + 1} - {title or 'Untitled'}")
+        else:
+            dialog.title(title or "Edit Slide")
         dialog.geometry("640x660")
         dialog.configure(bg="#2e2e2e")
 
@@ -1363,7 +1845,7 @@ class SlideGeneratorApp:
         fields: Dict[str, Entry] = {}
         for field in simple_fields:
             Label(meta_frame, text=field.capitalize(), bg="#2e2e2e", fg="#dd8a12").pack(anchor="w")
-            entry = Entry(meta_frame, bg="#1e1e1e", fg="#dd8a12", insertbackground="#dd8a12")
+            entry = Entry(meta_frame, bg="#1e1e1e", fg="#dd8a12", selectbackground="#dd8a12", selectforeground="#1e1e1e", insertbackground="#dd8a12")
             entry.insert(0, slide.get(field, ""))
             entry.bind("<KeyRelease>", modify)
             entry.pack(fill="x")
@@ -1374,7 +1856,7 @@ class SlideGeneratorApp:
         for field in simple_fields:
             Label(meta_frame, text=field.capitalize(), bg="#2e2e2e", fg="#dd8a12",
                   font=("Courier New", 10)).pack(anchor="w", padx=10, pady=(6, 0))
-            entry = Entry(meta_frame, bg="#1e1e1e", fg="#dd8a12",
+            entry = Entry(meta_frame, bg="#1e1e1e", fg="#dd8a12", selectbackground="#dd8a12", selectforeground="#1e1e1e",
                           insertbackground="#dd8a12", font=("Courier New", 10))
             entry.insert(0, slide.get(field, ""))
             entry.bind("<KeyRelease>", modify)
@@ -1421,7 +1903,7 @@ class SlideGeneratorApp:
                     content_widget = []
 
                     if text_type.get() == "p":
-                        text = Text(content_frame, height=3, bg="#1e1e1e", fg="#dd8a12", insertbackground="#dd8a12", font=("Courier New", 10))
+                        text = Text(content_frame, height=3, bg="#1e1e1e", fg="#dd8a12", selectbackground="#dd8a12", selectforeground="#1e1e1e", insertbackground="#dd8a12", font=("Courier New", 10))
                         if text_data and text_data["type"] == "p":
                             text.insert("1.0", text_data["content"])
                         text.pack(fill="x", padx=4, pady=2)
@@ -1434,14 +1916,14 @@ class SlideGeneratorApp:
                             else [""]
                         )
                         for item in initial:
-                            e = Entry(content_frame, bg="#1e1e1e", fg="#dd8a12", insertbackground="#dd8a12", font=("Courier New", 10))
+                            e = Entry(content_frame, bg="#1e1e1e", fg="#dd8a12", selectbackground="#dd8a12", selectforeground="#1e1e1e", insertbackground="#dd8a12", font=("Courier New", 10))
                             e.insert(0, item)
                             e.pack(fill="x", padx=4, pady=2)
                             entries.append(e)
 
                         def check_to_add_new(event: Event, last_entry: Entry) -> None:
                             if last_entry.get() and last_entry == entries[-1]:
-                                ne = Entry(content_frame, bg="#1e1e1e", fg="#dd8a12", insertbackground="#dd8a12", font=("Courier New", 10))
+                                ne = Entry(content_frame, bg="#1e1e1e", fg="#dd8a12", selectbackground="#dd8a12", selectforeground="#1e1e1e", insertbackground="#dd8a12", font=("Courier New", 10))
                                 ne.pack(fill="x", padx=4, pady=2)
                                 ne.bind("<KeyRelease>", lambda ev: check_to_add_new(ev, ne))
                                 entries.append(ne)
@@ -1508,7 +1990,7 @@ class SlideGeneratorApp:
             nonlocal unsaved_slide
             if _modify:
                 unsaved_slide = True
-            e = Entry(notes_container, bg="#1e1e1e", fg="#dd8a12",
+            e = Entry(notes_container, bg="#1e1e1e", fg="#dd8a12", selectbackground="#dd8a12", selectforeground="#1e1e1e",
                       insertbackground="#dd8a12", font=("Courier New", 10))
             e.insert(0, value)
             e.pack(fill="x", padx=10, pady=2)
