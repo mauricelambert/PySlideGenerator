@@ -222,10 +222,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (diff < minDiff) { minDiff = diff; closest = i; }
       });
       slide_index = closest;
+      updateProgressBars();
+      updateTocVisibility();
       if (typeof broadcastSlide === 'function') broadcastSlide(closest);
     }, 100);
   });
 
+  initProgressBars();
   updateTocVisibility();
 });
 
@@ -1215,7 +1218,6 @@ function fitTocToSlide(tocEl, minFontSize = 8) {
 
   tocEl.style.overflow = "hidden";
 
-  console.log(getHeight(), getAvailable());
   while (getHeight() > getAvailable() && size > minFontSize) {
     size -= 1;
     tocEl.style.fontSize = size + "px";
@@ -1309,6 +1311,95 @@ window.addEventListener('hashchange', () => {
         document.querySelectorAll('main section')
     ).indexOf(target);
 
-    console.log("hashchange", window.location.hash, slide_index);
+    updateProgressBars();
     updateTocVisibility();
 });
+
+let presentationProgressBar = null;
+let lastPresentationProgress = 0;
+let lastSectionProgress = 0;
+
+function initProgressBars() {
+  presentationProgressBar = document.createElement('div');
+  presentationProgressBar.id = 'presentation-progress';
+  document.body.appendChild(presentationProgressBar);
+}
+
+function getSectionData(index) {
+  const titles = Array.from(sections)
+    .map((s, i) => ({
+      slide: s,
+      index: i
+    }))
+    .filter(
+      s =>
+        s.slide.classList.contains('title-slide')
+        || s.slide.classList.contains('subtitle-slide')
+    );
+
+  if (!titles.length) {
+    return null;
+  }
+
+  let currentSection = 0;
+
+  for (let i = 0; i < titles.length; i++) {
+    if (index >= titles[i].index) {
+      currentSection = i;
+    }
+  }
+
+  return {
+    current: currentSection + 1,
+    total: titles.length
+  };
+}
+
+function updateProgressBars() {
+  if (!presentationProgressBar) {
+    return;
+  }
+
+  const globalProgress = sections_length <= 1 ? 100
+      : (slide_index / (sections_length - 1)) * 100;
+
+  presentationProgressBar.style.width = globalProgress + '%';
+  const currentSlide = sections[slide_index];
+
+  document
+    .querySelectorAll('.section-progress-wrapper')
+    .forEach(el => el.remove());
+
+  if (
+    !currentSlide.classList.contains('title-slide')
+    && !currentSlide.classList.contains('subtitle-slide')
+  ) {
+    return;
+  }
+
+  const data = getSectionData(slide_index);
+  if (!data) {
+    return;
+  }
+
+  const wrapper = document.createElement('div');
+  wrapper.className = 'section-progress-wrapper';
+
+  wrapper.innerHTML = `
+    <div class="section-progress-label">
+      SECTION ${data.current} / ${data.total}
+    </div>
+    <div class="section-progress-track">
+      <div class="section-progress-fill"></div>
+    </div>
+  `;
+
+  currentSlide.appendChild(wrapper);
+  const fill = wrapper.querySelector('.section-progress-fill');
+  const target = (data.current / data.total) * 100;
+  void fill.offsetWidth;
+  fill.style.width = target + '%';
+  /*requestAnimationFrame(() => {
+    fill.style.width = target + '%';
+  });*/
+}
