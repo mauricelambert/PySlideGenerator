@@ -4,7 +4,26 @@
 
 ## Description
 
-Little GUI to generate my slides.
+**A powerful GUI for creating HTML-based "hacker-style" presentation slides**
+
+Generate visually striking presentations through an intuitive interface with extensive customization options. Easily create and manage slides featuring titles, subtitles, speaker notes, images, code snippets with syntax highlighting, references and sources, animations, and much more.
+
+Designed for technical talks, cybersecurity demonstrations, developer conferences, and educational content, this tool allows you to build professional-looking HTML slide decks while adapting the visual style to your needs—from minimalist terminal aesthetics to fully customized hacker-inspired themes.
+
+**Features**
+
+ - 🎨 Multiple customizable visual themes and styles
+ - 📝 Speaker notes support
+ - 📌 Titles and subtitles management
+ - 🖼️ Image integration
+ - 💻 Code block support with syntax highlighting
+ - 📚 References and source citations
+ - ✨ Built-in animations and transitions
+ - ⚙️ Easy slide configuration through a graphical interface
+ - 🌐 HTML output for maximum portability
+
+Create engaging, technical, and visually impactful presentations without manually editing HTML files.
+
 
 ## Requirements
 
