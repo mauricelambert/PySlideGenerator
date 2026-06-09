@@ -23,7 +23,7 @@
 little GUI to generate my slides
 """
 
-__version__ = "3.0.0"
+__version__ = "3.1.0"
 __author__ = "Maurice Lambert"
 __author_email__ = "mauricelambert434@gmail.com"
 __maintainer__ = "Maurice Lambert"
@@ -668,6 +668,26 @@ content_image_only = Template(
       <aside>${aside}</aside>"""
 )
 
+cards_content = Template(
+    """<header>
+        <img src="${icon}" alt="${icon_alt}" />
+        <h3>${title}</h3>
+      </header>
+
+      <article class="cards-container">
+        ${cards}
+      </article>
+
+      <aside>${aside}</aside>"""
+)
+
+card_template = Template(
+    """<div class="card">
+        <h4>${title}</h4>
+        <p>${content}</p>
+      </div>"""
+)
+
 code_button_template = Template(
     """<button class="code-popup-btn"
     data-code="${code}"
@@ -819,10 +839,11 @@ class ScrollableFrame(Frame):
         self.canvas.unbind_all("<MouseWheel>")
 
 SLIDE_TYPES = [
-    ("Part title",      "title"),
+    ("Part title",          "title"),
     ("Content (img right)", "content"),
     ("Content (img left)",  "content-left"),
-    ("Image only",      "image-only"),
+    ("Image only",          "image-only"),
+    ("Cards",               "cards"),
 ]
 
 SLIDE_TYPE_LABELS = {k: lbl for lbl, k in SLIDE_TYPES}
@@ -1009,11 +1030,9 @@ class SlideGeneratorApp:
                     image_alt=image_alt,
                     code_button=btn_html,
                 )
-
                 titles += table_of_content_content.safe_substitute(
                     title=slide["title"], id=slide_html_index
                 )
-
                 class_name = "content-slide"
 
             elif slide_type == "title":
@@ -1044,13 +1063,31 @@ class SlideGeneratorApp:
                     image_alt=image_alt,
                     aside=slide.get("aside", ""),
                 )
-
                 titles += table_of_content_content.safe_substitute(
                     title=slide.get("title", "(image)"),
                     id=slide_html_index
                 )
-
                 class_name = "content-slide image-only-slide"
+
+            elif slide_type == "cards":
+                cards_html = ""
+                for card in slide.get("cards", []):
+                    cards_html += card_template.safe_substitute(
+                        title=card.get("title", ""),
+                        content=card.get("content", "")
+                    )
+                section_content = cards_content.safe_substitute(
+                    icon=slide.get("icon", ""),
+                    icon_alt=icon_alt,
+                    title=slide.get("title", ""),
+                    cards=cards_html,
+                    aside=slide.get("aside", ""),
+                )
+                titles += table_of_content_content.safe_substitute(
+                    title=slide.get("title", ""),
+                    id=slide_html_index
+                )
+                class_name = "cards-slide"
 
             else:
                 continue
@@ -1158,6 +1195,23 @@ class SlideGeneratorApp:
                     warnings.append(f"Slide {index}: no image")
                     invalid_indexes.add(index - 1)
 
+            if slide["type"] == "cards":
+                cards = slide.get("cards", [])
+                if not cards:
+                    warnings.append(
+                        f"Slide {index}: no cards"
+                    )
+                    invalid_indexes.add(index - 1)
+                for card in cards:
+                    if not card.get("title", "").strip():
+                        warnings.append(
+                            f"Slide {index}: card without title"
+                        )
+                    if not card.get("content", "").strip():
+                        warnings.append(
+                            f"Slide {index}: card without content"
+                        )
+
         if invalid_indexes:
             self.refresh_slide_colors(invalid_indexes)
             first_invalid = min(invalid_indexes)
@@ -1174,6 +1228,13 @@ class SlideGeneratorApp:
             return 10
         if slide_type == "image-only":
             return 15
+        if slide_type == "cards":
+          words = 0
+          for card in slide.get("cards", []):
+              words += len(card.get("title", "").split())
+              words += len(card.get("content", "").split())
+          reading_time = (words / 110) * 60
+          return max(20, round(reading_time * 2))
 
         words = 0
         for block in slide.get("texts", []):
@@ -1471,6 +1532,26 @@ class SlideGeneratorApp:
                 )
                 class_name = "content-slide image-only-slide"
 
+            elif slide_type == "cards":
+                cards_html = ""
+                for card in slide.get("cards", []):
+                    cards_html += card_template.safe_substitute(
+                        title=card.get("title", ""),
+                        content=card.get("content", "")
+                    )
+                section_content = cards_content.safe_substitute(
+                    icon=slide.get("icon", ""),
+                    icon_alt=icon_alt,
+                    title=slide.get("title", ""),
+                    cards=cards_html,
+                    aside=slide.get("aside", ""),
+                )
+                titles += table_of_content_content.safe_substitute(
+                    title=slide.get("title", ""),
+                    id=slide_html_index
+                )
+                class_name = "cards-slide"
+
             else:
                 continue
 
@@ -1615,7 +1696,7 @@ class SlideGeneratorApp:
     def add_slide_dialog(self) -> None:
         dialog = Toplevel(self.root)
         dialog.title("Add Slide")
-        dialog.geometry("340x230")
+        dialog.geometry("340x340")
         dialog.configure(bg="#2e2e2e")
 
         Label(dialog, text="Position", bg="#2e2e2e", fg="#dd8a12").pack(pady=5)
@@ -1664,6 +1745,11 @@ class SlideGeneratorApp:
                     "aside": self.data["default aside"],
                     "image": "",
                     "image alt": "",
+                })
+            elif slide_type == "cards":
+                slide.update({
+                    "aside": self.data["default aside"],
+                    "cards": [],
                 })
 
             self.update_data_from_fields()
@@ -1835,9 +1921,7 @@ class SlideGeneratorApp:
 
         meta_frame = tab_frames["Metadata"]
 
-        if slide_type in ("content", "content-left"):
-            simple_fields = ("icon", "icon alt", "title", "image", "image alt", "aside")
-        elif slide_type == "image-only":
+        if slide_type in ("content", "content-left", "image-only", "cards"):
             simple_fields = ("icon", "icon alt", "title", "image", "image alt", "aside")
         else:
             simple_fields = ("icon", "icon alt", "title")
@@ -1968,6 +2052,33 @@ class SlideGeneratorApp:
             code_text_widget.insert("1.0", slide.get("code", ""))
             code_text_widget.bind("<KeyRelease>", modify)
             code_text_widget.pack(fill="both", expand=True, padx=10, pady=2)
+        elif slide_type == "cards":
+            card_widgets = []
+            scroll_frame = ScrollableFrame(content_tab)
+            scroll_frame.pack(fill="both", expand=True, pady=10)
+            text_container = scroll_frame.scrollable_frame
+            Label(text_container, text="Cards", bg="#2e2e2e", fg="#dd8a12", font=("Courier New", 10)).pack(anchor="w", padx=10, pady=(8, 2))
+
+            def add_card(card_data=None):
+                nonlocal unsaved_slide
+                unsaved_slide = True
+                frame = Frame(text_container, bg="#1e1e1e")
+                frame.pack(fill="x", padx=6, pady=6)
+                Label(frame, text="Card title", bg="#1e1e1e", fg="#dd8a12").pack(anchor="w")
+                title_entry = Entry(frame, bg="#111111", fg="#dd8a12", insertbackground="#dd8a12")
+                title_entry.pack(fill="x", pady=2)
+                Label(frame, text="Content", bg="#1e1e1e", fg="#dd8a12").pack(anchor="w")
+                content_text = Text(frame, height=5, bg="#111111", fg="#dd8a12", insertbackground="#dd8a12")
+                content_text.pack(fill="x", pady=2)
+                if card_data:
+                    title_entry.insert(0, card_data.get("title", ""))
+                    content_text.insert("1.0", card_data.get("content", ""))
+                card_widgets.append((title_entry, content_text))
+
+            for card in slide.get("cards", []):
+                add_card(card)
+
+            Button(content_tab, text="+ Add Card", command=add_card, bg="#1e1e1e", fg="#dd8a12").pack(anchor="w", padx=10, pady=10)
         else:
             Label(content_tab,
                   text="No editable content for this slide type.",
@@ -1975,7 +2086,6 @@ class SlideGeneratorApp:
 
         notes_tab = tab_frames["Notes"]
         note_entries: List[Entry] = []
-
         notes_scroll = ScrollableFrame(notes_tab)
         notes_scroll.pack(fill="both", expand=True)
         notes_container = notes_scroll.scrollable_frame
@@ -2030,6 +2140,13 @@ class SlideGeneratorApp:
                 slide["texts"] = new_texts
                 slide["code"] = code_text_widget.get("1.0", "end").strip()
                 slide["code lang"] = code_lang_entry.get().strip()
+            elif slide_type == "cards":
+                slide["cards"] = []
+                for title_entry, content_text in card_widgets:
+                    title = title_entry.get().strip()
+                    content = (content_text.get("1.0", "end").strip())
+                    if title or content:
+                        slide["cards"].append({"title": title, "content": content})
 
             slide["notes"] = [e.get().strip() for e in note_entries if e.get().strip()]
 

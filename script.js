@@ -233,9 +233,41 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 const resizeContent = (slides_parameter = null) => {
-  const slides = slides_parameter || document.querySelectorAll('.content-slide, .table-content');
+  const slides = slides_parameter || document.querySelectorAll('.content-slide, .table-content, .cards-slide');
 
   slides.forEach(slide => {
+    if (slide.classList.contains('cards-slide')) {
+      const cards = slide.querySelectorAll('.card');
+
+      cards.forEach(card => {
+        const title = card.querySelector('h4');
+        const text = card.querySelector('p');
+
+        if (!title || !text) return;
+
+        const baseTitle = parseFloat(getComputedStyle(title).fontSize);
+        const baseText = parseFloat(getComputedStyle(text).fontSize);
+
+        const minTitle = 14;
+        const minText = 12;
+
+        let offset = 0;
+
+        const fits = () => slide.scrollHeight <= slide.clientHeight;
+
+        while (!fits() && (baseTitle - offset > minTitle || baseText - offset > minText)) {
+          if (baseTitle - offset > minTitle) {
+            title.style.fontSize = (baseTitle - offset) + "px";
+          }
+          if (baseText - offset > minText) {
+            text.style.fontSize = (baseText - offset) + "px";
+          }
+          offset++;
+        }
+      });
+
+      return;
+    }
     const article = slide.querySelector('article, nav');
     if (!article) return;
 
