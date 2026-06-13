@@ -981,11 +981,23 @@ section.cards-slide {
 
 section.cards-slide .cards-container {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  grid-template-columns: repeat(3, minmax(240px, 1fr));
   gap: clamp(1rem, 3vw, 2rem);
   width: 100%;
   max-width: min(1400px, 95vw);
   margin: auto 0;
+}
+
+@media (max-width: 900px) {
+  section.cards-slide .cards-container {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  section.cards-slide .cards-container {
+    grid-template-columns: 1fr;
+  }
 }
 
 section.cards-slide .card {
