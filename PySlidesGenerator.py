@@ -1921,8 +1921,10 @@ class SlideGeneratorApp:
 
         meta_frame = tab_frames["Metadata"]
 
-        if slide_type in ("content", "content-left", "image-only", "cards"):
+        if slide_type in ("content", "content-left", "image-only"):
             simple_fields = ("icon", "icon alt", "title", "image", "image alt", "aside")
+        elif slide_type == "cards":
+            simple_fields = ("icon", "icon alt", "title", "aside")
         else:
             simple_fields = ("icon", "icon alt", "title")
 
